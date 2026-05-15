@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Points Strategy Prototype</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body class="mode-ev">
+  <main class="page-shell">
+    <header class="hero-card">
+      <div>
+        <p class="eyebrow">Formula Student scoring prototype</p>
+        <h1>Points Strategy Prototype</h1>
+        <p class="subtitle">Compare Endurance + Efficiency and Driverless Trackdrive strategies</p>
+      </div>
+      <div class="hero-note">
+        <p>Standalone tool to compare points strategy assumptions across competitions and driving modes.</p>
+      </div>
+    </header>
+
+    <section class="card">
+      <div class="section-heading">
+        <div>
+          <p class="section-label">Section 1</p>
+          <h2>Competition Selection &amp; Benchmarks</h2>
+        </div>
+        <p class="section-copy">Select the competition and mode, then review the loaded benchmark references before calculating scenarios.</p>
+      </div>
+
+      <div class="benchmark-grid benchmark-grid-top">
+        <label class="field">
+          <span>Race selector</span>
+          <select id="race-select">
+            <option value="portugal">Portugal</option>
+            <option value="germany">Germany</option>
+            <option value="italy">Italy</option>
+          </select>
+        </label>
+        <label class="field">
+          <span>Mode selector</span>
+          <select id="mode-select">
+            <option value="ev">Manual / EV</option>
+            <option value="dv">Driverless / DV</option>
+          </select>
+        </label>
+        <div class="mode-badge-wrap">
+          <span class="field-label">Active mode</span>
+          <span id="mode-badge" class="mode-badge mode-badge-ev">Manual / EV</span>
+        </div>
+      </div>
+
+      <div id="benchmark-status" class="message message-info hidden" role="status"></div>
+      <div id="benchmark-note" class="message message-subtle hidden" role="status"></div>
+      <div id="benchmark-warning" class="message message-warning hidden" role="status"></div>
+
+      <article class="benchmark-card">
+        <div class="benchmark-card-header">
+          <h3>Loaded benchmarks</h3>
+          <p id="benchmark-card-title" class="benchmark-card-title">Portugal - Manual / EV benchmarks</p>
+        </div>
+        <ul id="benchmark-details" class="benchmark-list"></ul>
+      </article>
+
+      <div class="benchmark-grid benchmark-grid-bottom">
+        <label class="field" id="reference-primary-field">
+          <span id="reference-primary-label">Fastest Endurance Time, Tmin [s]</span>
+          <input id="reference-primary-input" type="number" min="0.01" step="0.001" value="1516.701">
+        </label>
+        <label class="field" id="reference-secondary-field">
+          <span id="reference-secondary-label">Best Efficiency Factor, EFmin</span>
+          <input id="reference-secondary-input" type="number" min="0.01" step="any" value="10152966">
+        </label>
+        <label class="field" id="energy-unit-field">
+          <span>Energy unit label</span>
+          <input id="energy-unit-input" type="text" value="kWh" placeholder="kWh">
+        </label>
+      </div>
+
+      <div class="formula-grid">
+        <article class="formula-card" id="formula-card-primary">
+          <h3>Endurance defaults</h3>
+          <ul id="formula-primary-list">
+            <li><strong>Pmax</strong> = 250</li>
+            <li><strong>Pmin</strong> = 25</li>
+            <li><strong>Tmax</strong> = 1.5 × Tmin</li>
+          </ul>
+        </article>
+        <article class="formula-card" id="formula-card-secondary">
+          <h3>Efficiency defaults</h3>
+          <ul id="formula-secondary-list">
+            <li><strong>Pmax</strong> = 75</li>
+            <li><strong>EFteam</strong> = Tteam² × Eteam</li>
+            <li><strong>EFmax</strong> = 2 × EFmin</li>
+          </ul>
+        </article>
+      </div>
+    </section>
+
+    <section class="card" id="scenario-section">
+      <div class="section-heading">
+        <div>
+          <p class="section-label">Section 2</p>
+          <h2 id="scenario-section-title">Endurance + Efficiency Scenarios</h2>
+        </div>
+        <p id="scenario-section-copy" class="section-copy">Each row represents one setup or race strategy to compare.</p>
+      </div>
+
+      <div id="error-banner" class="message message-error hidden" role="alert"></div>
+      <div id="info-banner" class="message message-info hidden" role="status"></div>
+
+      <div class="table-wrap">
+        <table class="data-table input-table">
+          <thead>
+            <tr id="scenario-table-head-row"></tr>
+          </thead>
+          <tbody id="scenario-table-body"></tbody>
+        </table>
+      </div>
+
+      <div class="button-row">
+        <button id="add-scenario-btn" type="button" class="btn btn-secondary">Add scenario</button>
+        <button id="calculate-btn" type="button" class="btn btn-primary">Calculate</button>
+        <button id="load-demo-btn" type="button" class="btn btn-secondary">Load demo data</button>
+        <button id="clear-scenarios-btn" type="button" class="btn btn-secondary">Clear scenarios</button>
+        <button id="export-csv-btn" type="button" class="btn btn-secondary">Export CSV</button>
+      </div>
+    </section>
+
+    <section class="card" id="results-section">
+      <div class="section-heading">
+        <div>
+          <p class="section-label">Section 3</p>
+          <h2>Results</h2>
+        </div>
+        <p id="results-section-copy" class="section-copy">Results are automatically sorted from highest to lowest score.</p>
+      </div>
+
+      <div class="table-wrap">
+        <table class="data-table">
+          <thead>
+            <tr id="results-table-head-row"></tr>
+          </thead>
+          <tbody id="results-table-body">
+            <tr>
+              <td colspan="9" class="empty-state">Press Calculate to rank the scenarios.</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="card recommendation-card" id="recommendation-card">
+      <div class="section-heading">
+        <div>
+          <p class="section-label">Section 4</p>
+          <h2>Recommendation</h2>
+        </div>
+        <p class="section-copy">A quick summary of the best scoring trade-off.</p>
+      </div>
+
+      <div id="recommendation-content" class="recommendation-placeholder">
+        Run a calculation to generate a recommendation card.
+      </div>
+    </section>
+  </main>
+
+  <script src="app.js"></script>
+</body>
+</html>
