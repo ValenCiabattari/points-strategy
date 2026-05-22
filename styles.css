@@ -144,12 +144,16 @@ h1 {
 }
 
 .benchmark-grid-top {
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
 }
 
 .benchmark-grid-bottom {
   grid-template-columns: repeat(3, minmax(0, 1fr));
   margin-top: 18px;
+}
+
+.benchmark-editor-grid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
 }
 
 .formula-grid {
@@ -361,6 +365,10 @@ body.mode-dv .data-table thead {
 .button-row {
   grid-template-columns: repeat(5, minmax(120px, 1fr));
   margin-top: 16px;
+}
+
+.button-row-compact {
+  grid-template-columns: repeat(2, minmax(180px, 1fr));
 }
 
 .btn {

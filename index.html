@@ -44,6 +44,13 @@
             <option value="dv">Driverless / DV</option>
           </select>
         </label>
+        <label class="field" id="ruleset-field">
+          <span>Scoring formula</span>
+          <select id="ruleset-select">
+            <option value="2025">2025</option>
+            <option value="2026">2026</option>
+          </select>
+        </label>
         <div class="mode-badge-wrap">
           <span class="field-label">Active mode</span>
           <span id="mode-badge" class="mode-badge mode-badge-ev">Manual / EV</span>
@@ -60,6 +67,18 @@
           <p id="benchmark-card-title" class="benchmark-card-title">Portugal - Manual / EV benchmarks</p>
         </div>
         <ul id="benchmark-details" class="benchmark-list"></ul>
+      </article>
+
+      <article class="benchmark-card">
+        <div class="benchmark-card-header">
+          <h3>Benchmark editor</h3>
+          <p class="benchmark-card-title">Local prototype values for the selected race and mode</p>
+        </div>
+        <div id="benchmark-editor-fields" class="benchmark-grid benchmark-editor-grid"></div>
+        <div class="button-row button-row-compact">
+          <button id="save-benchmarks-btn" type="button" class="btn btn-secondary">Save loaded benchmarks</button>
+          <button id="reset-benchmarks-btn" type="button" class="btn btn-secondary">Reset loaded benchmarks</button>
+        </div>
       </article>
 
       <div class="benchmark-grid benchmark-grid-bottom">
@@ -83,15 +102,15 @@
           <ul id="formula-primary-list">
             <li><strong>Pmax</strong> = 250</li>
             <li><strong>Pmin</strong> = 25</li>
-            <li><strong>Tmax</strong> = 1.5 × Tmin</li>
+            <li><strong>Tmax</strong> = 1.5 x Tmin</li>
           </ul>
         </article>
         <article class="formula-card" id="formula-card-secondary">
           <h3>Efficiency defaults</h3>
           <ul id="formula-secondary-list">
             <li><strong>Pmax</strong> = 75</li>
-            <li><strong>EFteam</strong> = Tteam² × Eteam</li>
-            <li><strong>EFmax</strong> = 2 × EFmin</li>
+            <li><strong>EFteam</strong> = Tteam^2 x Eteam</li>
+            <li><strong>EFmax</strong> = 2 x EFmin</li>
           </ul>
         </article>
       </div>

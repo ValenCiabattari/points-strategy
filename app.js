@@ -1,8 +1,48 @@
 const ENDURANCE_PMAX = 250;
-const ENDURANCE_PMIN = 25;
 const EFFICIENCY_PMAX = 75;
 const TRACKDRIVE_PMAX = 200;
 const TRACKDRIVE_BASE_MAX = 0.75 * TRACKDRIVE_PMAX;
+
+const SCORING_RULESETS = {
+  "2025": {
+    label: "2025",
+    endurance: {
+      title: "Endurance defaults",
+      summary: [
+        "<strong>Pmax</strong> = 250",
+        "<strong>Pmin</strong> = 25",
+        "<strong>Tmax</strong> = 1.5 x Tmin"
+      ]
+    },
+    efficiency: {
+      title: "Efficiency defaults",
+      summary: [
+        "<strong>Pmax</strong> = 75",
+        "<strong>EFteam</strong> = Tteam^2 x Eteam",
+        "<strong>EFmax</strong> = 2 x EFmin"
+      ]
+    }
+  },
+  "2026": {
+    label: "2026",
+    endurance: {
+      title: "Endurance defaults",
+      summary: [
+        "<strong>Pmax</strong> = 250",
+        "<strong>Pmin</strong> = 0.1 x Pmax = 25",
+        "<strong>Tmax</strong> = 1.333 x Tmin"
+      ]
+    },
+    efficiency: {
+      title: "Efficiency defaults",
+      summary: [
+        "<strong>Pmax</strong> = 75",
+        "<strong>EFteam</strong> = Tteam^2 x Eteam",
+        "<strong>EFmax</strong> = 1.5 x EFmin"
+      ]
+    }
+  }
+};
 
 const competitionData = {
   portugal: {
@@ -82,6 +122,8 @@ const competitionData = {
   }
 };
 
+const originalCompetitionData = JSON.parse(JSON.stringify(competitionData));
+
 const evDemoScenarios = [
   {
     name: "Conservative / Low energy",
@@ -157,18 +199,22 @@ const dvDemoScenarios = {
 const state = {
   results: [],
   currentRace: "portugal",
-  currentMode: "ev"
+  currentMode: "ev",
+  currentRuleset: "2025"
 };
 
 const elements = {
   raceSelect: document.getElementById("race-select"),
   modeSelect: document.getElementById("mode-select"),
+  rulesetField: document.getElementById("ruleset-field"),
+  rulesetSelect: document.getElementById("ruleset-select"),
   modeBadge: document.getElementById("mode-badge"),
   benchmarkStatus: document.getElementById("benchmark-status"),
   benchmarkNote: document.getElementById("benchmark-note"),
   benchmarkWarning: document.getElementById("benchmark-warning"),
   benchmarkCardTitle: document.getElementById("benchmark-card-title"),
   benchmarkDetails: document.getElementById("benchmark-details"),
+  benchmarkEditorFields: document.getElementById("benchmark-editor-fields"),
   referencePrimaryField: document.getElementById("reference-primary-field"),
   referencePrimaryLabel: document.getElementById("reference-primary-label"),
   referencePrimaryInput: document.getElementById("reference-primary-input"),
@@ -191,7 +237,9 @@ const elements = {
   calculateButton: document.getElementById("calculate-btn"),
   loadDemoButton: document.getElementById("load-demo-btn"),
   clearScenariosButton: document.getElementById("clear-scenarios-btn"),
-  exportCsvButton: document.getElementById("export-csv-btn")
+  exportCsvButton: document.getElementById("export-csv-btn"),
+  saveBenchmarksButton: document.getElementById("save-benchmarks-btn"),
+  resetBenchmarksButton: document.getElementById("reset-benchmarks-btn")
 };
 
 function clamp(value, min, max) {
@@ -247,6 +295,10 @@ function getSelectedMode() {
   return state.currentMode;
 }
 
+function getSelectedRuleset() {
+  return SCORING_RULESETS[state.currentRuleset] ?? SCORING_RULESETS["2025"];
+}
+
 function isEVMode() {
   return getSelectedMode() === "ev";
 }
@@ -262,6 +314,51 @@ function getModeLabel() {
 function getCompetitionModeData() {
   const competition = getSelectedCompetition();
   return competition?.[getSelectedMode()] ?? null;
+}
+
+function getNestedValue(object, path) {
+  return path.split(".").reduce((current, key) => current?.[key], object);
+}
+
+function setNestedValue(object, path, value) {
+  const parts = path.split(".");
+  const lastKey = parts.pop();
+  let target = object;
+
+  parts.forEach((part) => {
+    if (!target[part] || typeof target[part] !== "object") {
+      target[part] = {};
+    }
+    target = target[part];
+  });
+
+  target[lastKey] = value;
+}
+
+function getBenchmarkEditorConfig() {
+  if (isEVMode()) {
+    return [
+      { key: "acceleration", label: "Acceleration [s]", step: "0.001", min: "0" },
+      { key: "skidpad", label: "Skidpad [s]", step: "0.001", min: "0" },
+      { key: "autocross", label: "Autocross [s]", step: "0.001", min: "0" },
+      { key: "endurance", label: "Endurance benchmark [s]", step: "0.001", min: "0" },
+      { key: "efficiency.time", label: "Efficiency time [s]", step: "0.001", min: "0" },
+      { key: "efficiency.energyKwh", label: `Energy used [${getEnergyUnitLabel()}]`, step: "0.001", min: "0" },
+      { key: "efficiency.efficiencyFactor", label: "Efficiency Factor", step: "any", min: "0" },
+      { key: "efficiency.efficiencyReported", label: "Reported efficiency value", step: "0.001", min: "0" },
+      { key: "efficiency.score", label: "Reported efficiency score", step: "0.001", min: "0" },
+      { key: "efficiency.endurancePoints", label: "Reported endurance score", step: "0.001", min: "0" },
+      { key: "efficiency.laps", label: "Efficiency laps", step: "1", min: "0" }
+    ];
+  }
+
+  return [
+    { key: "acceleration", label: "Acceleration [s]", step: "0.001", min: "0" },
+    { key: "skidpad", label: "Skidpad [s]", step: "0.001", min: "0" },
+    { key: "autocross", label: "Autocross [s]", step: "0.001", min: "0" },
+    { key: "trackdrive", label: "Trackdrive benchmark [s]", step: "0.001", min: "0" },
+    { key: "trackdriveLaps", label: "Trackdrive laps", step: "1", min: "0" }
+  ];
 }
 
 function getEffectiveEfficiencyFactor(evData) {
@@ -319,49 +416,36 @@ function updateModeVisuals() {
   elements.modeBadge.className = isEVMode()
     ? "mode-badge mode-badge-ev"
     : "mode-badge mode-badge-dv";
+  elements.rulesetField.classList.toggle("hidden", isDVMode());
 }
 
 function updateReferenceFields() {
   if (isEVMode()) {
+    const selectedRuleset = getSelectedRuleset();
     elements.referencePrimaryLabel.textContent = "Fastest Endurance Time, Tmin [s]";
     elements.referenceSecondaryLabel.textContent = "Best Efficiency Factor, EFmin";
     elements.referenceSecondaryField.classList.remove("hidden");
     elements.energyUnitField.classList.remove("hidden");
 
-    const primaryTitle = document.getElementById("formula-card-primary").querySelector("h3");
-    primaryTitle.textContent = "Endurance defaults";
-    elements.formulaPrimaryList = document.getElementById("formula-primary-list");
-    elements.formulaSecondaryList = document.getElementById("formula-secondary-list");
-    elements.formulaPrimaryList.innerHTML = `
-      <li><strong>Pmax</strong> = 250</li>
-      <li><strong>Pmin</strong> = 25</li>
-      <li><strong>Tmax</strong> = 1.5 × Tmin</li>
-    `;
-    document.getElementById("formula-card-secondary").querySelector("h3").textContent = "Efficiency defaults";
-    elements.formulaSecondaryList.innerHTML = `
-      <li><strong>Pmax</strong> = 75</li>
-      <li><strong>EFteam</strong> = Tteam² × Eteam</li>
-      <li><strong>EFmax</strong> = 2 × EFmin</li>
-    `;
+    document.getElementById("formula-card-primary").querySelector("h3").textContent = `${selectedRuleset.label} ${selectedRuleset.endurance.title}`;
+    document.getElementById("formula-card-secondary").querySelector("h3").textContent = `${selectedRuleset.label} ${selectedRuleset.efficiency.title}`;
+    document.getElementById("formula-primary-list").innerHTML = selectedRuleset.endurance.summary.map((item) => `<li>${item}</li>`).join("");
+    document.getElementById("formula-secondary-list").innerHTML = selectedRuleset.efficiency.summary.map((item) => `<li>${item}</li>`).join("");
     return;
   }
 
   elements.referencePrimaryLabel.textContent = "Fastest Trackdrive Time, Tmin [s]";
   elements.referenceSecondaryField.classList.add("hidden");
   elements.energyUnitField.classList.add("hidden");
-
-  const primaryTitle = document.getElementById("formula-card-primary").querySelector("h3");
-  primaryTitle.textContent = "Trackdrive defaults";
-  elements.formulaPrimaryList = document.getElementById("formula-primary-list");
-  elements.formulaSecondaryList = document.getElementById("formula-secondary-list");
-  elements.formulaPrimaryList.innerHTML = `
+  document.getElementById("formula-card-primary").querySelector("h3").textContent = "Trackdrive defaults";
+  document.getElementById("formula-card-secondary").querySelector("h3").textContent = "Lap completion bonus";
+  document.getElementById("formula-primary-list").innerHTML = `
     <li><strong>Pmax</strong> = 200</li>
     <li><strong>Base score max</strong> = 150</li>
-    <li><strong>Tmax</strong> = 2 × Tfastest</li>
+    <li><strong>Tmax</strong> = 2 x Tfastest</li>
   `;
-  document.getElementById("formula-card-secondary").querySelector("h3").textContent = "Lap completion bonus";
-  elements.formulaSecondaryList.innerHTML = `
-    <li><strong>Bonus per lap</strong> = 0.025 × Pmax</li>
+  document.getElementById("formula-secondary-list").innerHTML = `
+    <li><strong>Bonus per lap</strong> = 0.025 x Pmax</li>
     <li><strong>Bonus per lap</strong> = 5 points</li>
     <li><strong>Total score</strong> capped at 200</li>
   `;
@@ -379,13 +463,16 @@ function updateBenchmarksFromSelection() {
     elements.referenceSecondaryInput.value = Number.isFinite(effectiveEfficiency.value) ? String(effectiveEfficiency.value) : "";
 
     if (Number.isFinite(modeData?.endurance) && Number.isFinite(effectiveEfficiency.value)) {
-      setMessage(elements.benchmarkStatus, `${competition.label} Manual / EV benchmarks loaded into Tmin and EFmin. You can still edit them manually.`);
+      setMessage(
+        elements.benchmarkStatus,
+        `${competition.label} Manual / EV benchmarks loaded into Tmin and EFmin using the ${state.currentRuleset} scoring rules. You can still edit them manually.`
+      );
     } else {
       setMessage(elements.benchmarkStatus, "Benchmarks for this competition are not fully loaded yet.");
     }
 
     if (effectiveEfficiency.derived) {
-      setMessage(elements.benchmarkNote, "Efficiency Factor calculated from time and energy.");
+      setMessage(elements.benchmarkNote, "Efficiency Factor was derived from the loaded time and energy values.");
     }
 
     return;
@@ -403,9 +490,9 @@ function updateBenchmarksFromSelection() {
 function renderBenchmarkCard() {
   const competition = getSelectedCompetition();
   const modeData = getCompetitionModeData();
-  elements.benchmarkCardTitle.textContent = `${competition.label} - ${getModeLabel()} benchmarks`;
-
   const items = [];
+
+  elements.benchmarkCardTitle.textContent = `${competition.label} - ${getModeLabel()} benchmarks`;
 
   if (isEVMode()) {
     const effectiveEfficiency = getEffectiveEfficiencyFactor(modeData);
@@ -414,28 +501,79 @@ function renderBenchmarkCard() {
     items.push(`Autocross: ${modeData?.autocross === null ? "Not registered" : `${formatDisplayValue(modeData?.autocross, 3)} s`}`);
     items.push(`Endurance: ${formatDisplayValue(modeData?.endurance, 3)} s`);
     items.push(`Efficiency reference time: ${formatDisplayValue(modeData?.efficiency?.time, 3)} s`);
-    items.push(`Energy used: ${formatDisplayValue(modeData?.efficiency?.energyKwh, 3)} kWh`);
+    items.push(`Energy used: ${formatDisplayValue(modeData?.efficiency?.energyKwh, 3)} ${getEnergyUnitLabel()}`);
 
     if (Number.isFinite(modeData?.efficiency?.laps)) {
       items.push(`Laps: ${formatDisplayValue(modeData.efficiency.laps, 0)}`);
     }
 
     items.push(`Efficiency Factor: ${formatDisplayValue(effectiveEfficiency.value, 0)}`);
+    items.push(`Efficiency formula set: ${state.currentRuleset}`);
   } else {
     items.push(`Acceleration: ${formatDisplayValue(modeData?.acceleration, 3)} s`);
     items.push(`Skidpad: ${formatDisplayValue(modeData?.skidpad, 3)} s`);
     items.push(`Autocross: ${modeData?.autocross === null ? "Not registered" : `${formatDisplayValue(modeData?.autocross, 3)} s`}`);
     items.push(`Trackdrive: ${formatDisplayValue(modeData?.trackdrive, 3)} s`);
-    if (modeData?.trackdriveLaps === null || modeData?.trackdriveLaps === undefined) {
-      items.push("Trackdrive laps: No data");
-    } else {
-      items.push(`Trackdrive laps: ${formatDisplayValue(modeData.trackdriveLaps, 0)}`);
-    }
+    items.push(
+      modeData?.trackdriveLaps === null || modeData?.trackdriveLaps === undefined
+        ? "Trackdrive laps: No data"
+        : `Trackdrive laps: ${formatDisplayValue(modeData.trackdriveLaps, 0)}`
+    );
   }
 
   elements.benchmarkDetails.innerHTML = items
     .map((item) => `<li>${escapeHtml(item)}</li>`)
     .join("");
+}
+
+function renderBenchmarkEditor() {
+  const modeData = getCompetitionModeData();
+  const fields = getBenchmarkEditorConfig();
+
+  elements.benchmarkEditorFields.innerHTML = fields.map((field) => {
+    const value = getNestedValue(modeData, field.key);
+    return `
+      <label class="field">
+        <span>${escapeHtml(field.label)}</span>
+        <input
+          type="number"
+          class="benchmark-editor-input"
+          data-key="${escapeHtml(field.key)}"
+          min="${field.min}"
+          step="${field.step}"
+          value="${value ?? ""}"
+          placeholder="Leave blank if not available"
+        >
+      </label>
+    `;
+  }).join("");
+}
+
+function saveBenchmarkEditorValues() {
+  const modeData = getCompetitionModeData();
+  const editorInputs = Array.from(elements.benchmarkEditorFields.querySelectorAll(".benchmark-editor-input"));
+
+  editorInputs.forEach((input) => {
+    const rawValue = input.value.trim();
+    const nextValue = rawValue === "" ? null : Number(rawValue);
+    setNestedValue(modeData, input.dataset.key, Number.isFinite(nextValue) ? nextValue : null);
+  });
+
+  updateBenchmarksFromSelection();
+  renderBenchmarkCard();
+  renderBenchmarkEditor();
+  showInfo("Loaded benchmarks updated for this prototype session.");
+}
+
+function resetBenchmarkEditorValues() {
+  const competitionKey = state.currentRace;
+  const modeKey = state.currentMode;
+  competitionData[competitionKey][modeKey] = JSON.parse(JSON.stringify(originalCompetitionData[competitionKey][modeKey]));
+
+  updateBenchmarksFromSelection();
+  renderBenchmarkCard();
+  renderBenchmarkEditor();
+  showInfo("Loaded benchmarks reset to the original prototype values.");
 }
 
 function getScenarioColumns() {
@@ -467,7 +605,6 @@ function renderScenarioTableHead() {
 
 function createScenarioRow(scenario = {}) {
   const row = document.createElement("tr");
-
   const primaryPlaceholder = isEVMode() ? "1535" : "225";
   const secondaryPlaceholder = isEVMode() ? "4.45" : "11";
   const secondaryStep = isEVMode() ? "0.01" : "1";
@@ -511,12 +648,7 @@ function getDemoScenariosForSelection() {
 function loadDemoData() {
   clearScenarios();
   getDemoScenariosForSelection().forEach((scenario) => addScenarioRow(scenario));
-
-  if (isEVMode()) {
-    showInfo("Endurance + Efficiency demo scenarios loaded.");
-  } else {
-    showInfo("Trackdrive demo scenarios loaded.");
-  }
+  showInfo(isEVMode() ? "Endurance + Efficiency demo scenarios loaded." : "Trackdrive demo scenarios loaded.");
 }
 
 function readBenchmarks() {
@@ -606,17 +738,26 @@ function validateDVInputs(benchmarks, scenarios) {
   return "";
 }
 
-function calculateEnduranceScore(Tteam, Tmin) {
+function calculateEnduranceScore(Tteam, Tmin, rulesetKey) {
+  if (rulesetKey === "2026") {
+    const Tmax = 1.333 * Tmin;
+    const cappedTime = Math.min(Tteam, Tmax);
+    const ratioTerm = ((Tmax / cappedTime) - 1) / 0.333;
+    const rawScore = (0.9 * ENDURANCE_PMAX * ratioTerm) + (0.1 * ENDURANCE_PMAX);
+    return clamp(rawScore, 0, ENDURANCE_PMAX);
+  }
+
+  const ENDURANCE_PMIN = 25;
   const Tmax = 1.5 * Tmin;
   const cappedTime = Math.min(Tteam, Tmax);
   const normalizedDelta = (Tmax - cappedTime) / (Tmax - Tmin);
-  const rawScore = (ENDURANCE_PMAX - ENDURANCE_PMIN) * (normalizedDelta ** 2) + ENDURANCE_PMIN;
+  const rawScore = ((ENDURANCE_PMAX - ENDURANCE_PMIN) * (normalizedDelta ** 2)) + ENDURANCE_PMIN;
   return clamp(rawScore, 0, ENDURANCE_PMAX);
 }
 
-function calculateEfficiencyScore(Tteam, Eteam, EFmin) {
+function calculateEfficiencyScore(Tteam, Eteam, EFmin, rulesetKey) {
   const EFteam = (Tteam ** 2) * Eteam;
-  const EFmax = 2 * EFmin;
+  const EFmax = rulesetKey === "2026" ? 1.5 * EFmin : 2 * EFmin;
 
   if (EFteam >= EFmax) {
     return 0;
@@ -626,29 +767,33 @@ function calculateEfficiencyScore(Tteam, Eteam, EFmin) {
     return EFFICIENCY_PMAX;
   }
 
+  if (rulesetKey === "2026") {
+    const rawScore = EFFICIENCY_PMAX * ((EFmax - EFteam) / (EFmax - EFmin));
+    return clamp(rawScore, 0, EFFICIENCY_PMAX);
+  }
+
   const rawScore = EFFICIENCY_PMAX * (((EFmax - EFteam) / (EFmax - EFmin)) ** 2);
   return clamp(rawScore, 0, EFFICIENCY_PMAX);
 }
 
 function calculateEVScenario(scenario, benchmarks) {
   const EFteam = (scenario.Tteam ** 2) * scenario.Eteam;
-  const endurancePoints = calculateEnduranceScore(scenario.Tteam, benchmarks.Tmin);
-  const efficiencyPoints = calculateEfficiencyScore(scenario.Tteam, scenario.Eteam, benchmarks.EFmin);
-  const combinedPoints = endurancePoints + efficiencyPoints;
+  const endurancePoints = calculateEnduranceScore(scenario.Tteam, benchmarks.Tmin, state.currentRuleset);
+  const efficiencyPoints = calculateEfficiencyScore(scenario.Tteam, scenario.Eteam, benchmarks.EFmin, state.currentRuleset);
 
   return {
     ...scenario,
     EFteam,
     endurancePoints,
     efficiencyPoints,
-    combinedPoints
+    combinedPoints: endurancePoints + efficiencyPoints
   };
 }
 
 function calculateTrackdriveScore(Tteam, completedLaps, fastestTrackdriveTime) {
   const Tmax = 2 * fastestTrackdriveTime;
   const correctedTime = Math.min(Tteam, Tmax);
-  const rawBaseScore = 0.75 * TRACKDRIVE_PMAX * (Tmax / correctedTime - 1);
+  const rawBaseScore = 0.75 * TRACKDRIVE_PMAX * ((Tmax / correctedTime) - 1);
   const baseScore = clamp(rawBaseScore, 0, TRACKDRIVE_BASE_MAX);
   const lapBonus = 0.025 * TRACKDRIVE_PMAX * Math.max(0, completedLaps);
   const totalScore = clamp(baseScore + lapBonus, 0, TRACKDRIVE_PMAX);
@@ -664,6 +809,7 @@ function calculateTrackdriveScore(Tteam, completedLaps, fastestTrackdriveTime) {
 
 function calculateDVScenario(scenario, benchmarks) {
   const trackdrive = calculateTrackdriveScore(scenario.Tteam, scenario.completedLaps || 0, benchmarks.fastestTrackdriveTime);
+
   return {
     ...scenario,
     baseTrackdrivePoints: trackdrive.baseScore,
@@ -763,14 +909,14 @@ function renderRecommendation(results) {
     }
 
     if (!(bestScenario.name === lowestEnergyScenario.name && bestScenario.Eteam === lowestEnergyScenario.Eteam)) {
-      messages.push("The lowest-energy scenario is not necessarily optimal because the time penalty reduces the Endurance score.");
+      messages.push("The lowest-energy scenario is not necessarily optimal because the time penalty can reduce the Endurance score.");
     }
 
     elements.recommendationContent.className = "recommendation-summary";
     elements.recommendationContent.innerHTML = `
       <p class="section-label">Best scenario</p>
       <h3>${escapeHtml(bestScenario.name)}</h3>
-      <p>This scenario gives the highest combined score under the current Endurance and Efficiency benchmark assumptions.</p>
+      <p>This scenario gives the highest combined score using the ${escapeHtml(state.currentRuleset)} Endurance and Efficiency formulas.</p>
       <div class="recommendation-stats">
         <article class="stat-chip">
           <p class="stat-label">Combined points</p>
@@ -923,7 +1069,7 @@ function calculateAllScenarios() {
     state.results = results;
     renderEVResults(results);
     renderRecommendation(results);
-    showInfo(`Calculated ${results.length} Endurance + Efficiency scenario${results.length === 1 ? "" : "s"}.`);
+    showInfo(`Calculated ${results.length} Endurance + Efficiency scenario${results.length === 1 ? "" : "s"} using the ${state.currentRuleset} formulas.`);
     return;
   }
 
@@ -950,7 +1096,7 @@ function refreshSectionCopy() {
   if (isEVMode()) {
     elements.scenarioSectionTitle.textContent = "Endurance + Efficiency Scenarios";
     elements.scenarioSectionCopy.textContent = "Each row represents one endurance and energy strategy to compare.";
-    elements.resultsSectionCopy.textContent = "Results are automatically sorted from highest to lowest combined score.";
+    elements.resultsSectionCopy.textContent = `Results are automatically sorted from highest to lowest combined score using the ${state.currentRuleset} formulas.`;
     return;
   }
 
@@ -967,6 +1113,7 @@ function applySelection() {
   renderResultsHeaders();
   updateBenchmarksFromSelection();
   renderBenchmarkCard();
+  renderBenchmarkEditor();
   clearScenarios();
   clearFeedbackMessages();
   state.results = [];
@@ -1001,10 +1148,22 @@ elements.exportCsvButton.addEventListener("click", () => {
   exportCSV(state.results);
 });
 
+elements.saveBenchmarksButton.addEventListener("click", () => {
+  clearFeedbackMessages();
+  saveBenchmarkEditorValues();
+});
+
+elements.resetBenchmarksButton.addEventListener("click", () => {
+  clearFeedbackMessages();
+  resetBenchmarkEditorValues();
+});
+
 elements.energyUnitInput.addEventListener("input", () => {
   if (isEVMode()) {
     renderScenarioTableHead();
     renderResultsHeaders();
+    renderBenchmarkCard();
+    renderBenchmarkEditor();
   }
 });
 
@@ -1018,6 +1177,12 @@ elements.modeSelect.addEventListener("change", () => {
   applySelection();
 });
 
+elements.rulesetSelect.addEventListener("change", () => {
+  state.currentRuleset = elements.rulesetSelect.value;
+  applySelection();
+});
+
 elements.raceSelect.value = state.currentRace;
 elements.modeSelect.value = state.currentMode;
+elements.rulesetSelect.value = state.currentRuleset;
 applySelection();
