@@ -48,11 +48,10 @@ const competitionData = {
   portugal: {
     label: "Portugal",
     ev: {
-      scoringSystem: "fsg-like",
       acceleration: 3.766,
       skidpad: 4.944,
       autocross: 57.183,
-      endurance: 1516.701,
+      endurance: 1544.701,
       efficiency: {
         energyKwh: 4.414,
         time: 1516.632,
@@ -74,7 +73,6 @@ const competitionData = {
   germany: {
     label: "Germany",
     ev: {
-      scoringSystem: "fsg-like",
       acceleration: 3.403,
       skidpad: 4.555,
       autocross: 72.719,
@@ -100,7 +98,6 @@ const competitionData = {
   italy: {
     label: "Italy",
     ev: {
-      scoringSystem: "fsae-italy-2025",
       acceleration: 3.302,
       skidpad: 4.351,
       autocross: 52.953,
@@ -130,22 +127,22 @@ const originalCompetitionData = JSON.parse(JSON.stringify(competitionData));
 const evDemoScenarios = [
   {
     name: "Conservative / Low energy",
-    primaryValue: 1560,
-    secondaryValue: 1550,
+    primaryValue: 1550,
+    secondaryValue: 1560,
     tertiaryValue: 4.2,
     notes: "Slower but lower energy consumption"
   },
   {
     name: "Balanced",
-    primaryValue: 1535,
-    secondaryValue: 1528,
+    primaryValue: 1528,
+    secondaryValue: 1535,
     tertiaryValue: 4.45,
     notes: "Balanced endurance time and energy consumption"
   },
   {
     name: "Aggressive / High power",
-    primaryValue: 1510,
-    secondaryValue: 1502,
+    primaryValue: 1502,
+    secondaryValue: 1510,
     tertiaryValue: 4.9,
     notes: "Faster but higher energy consumption"
   }
@@ -322,11 +319,6 @@ function getCompetitionModeData() {
   return competition?.[getSelectedMode()] ?? null;
 }
 
-function isCurrentEVScoringComparable() {
-  const modeData = getCompetitionModeData();
-  return !isEVMode() || !modeData?.scoringSystem || modeData.scoringSystem === "fsg-like";
-}
-
 function getNestedValue(object, path) {
   return path.split(".").reduce((current, key) => current?.[key], object);
 }
@@ -352,7 +344,7 @@ function getBenchmarkEditorConfig() {
       { key: "acceleration", label: "Acceleration [s]", step: "0.001", min: "0" },
       { key: "skidpad", label: "Skidpad [s]", step: "0.001", min: "0" },
       { key: "autocross", label: "Autocross [s]", step: "0.001", min: "0" },
-      { key: "endurance", label: "Endurance benchmark [s]", step: "0.001", min: "0" },
+      { key: "endurance", label: "Endurance corrected benchmark [s]", step: "0.001", min: "0" },
       { key: "efficiency.time", label: "Efficiency uncorrected time [s]", step: "0.001", min: "0" },
       { key: "efficiency.energyKwh", label: `Energy used [${getEnergyUnitLabel()}]`, step: "0.001", min: "0" },
       { key: "efficiency.efficiencyFactor", label: "Efficiency Factor", step: "any", min: "0" },
@@ -433,7 +425,7 @@ function updateModeVisuals() {
 function updateReferenceFields() {
   if (isEVMode()) {
     const selectedRuleset = getSelectedRuleset();
-    elements.referencePrimaryLabel.textContent = "Fastest Endurance Time, Tmin [s]";
+    elements.referencePrimaryLabel.textContent = "Fastest corrected Endurance Time, Tmin [s]";
     elements.referenceSecondaryLabel.textContent = "Best Efficiency Factor, EFmin";
     elements.referenceSecondaryField.classList.remove("hidden");
     elements.energyUnitField.classList.remove("hidden");
@@ -486,13 +478,6 @@ function updateBenchmarksFromSelection() {
       setMessage(elements.benchmarkNote, "Efficiency Factor was derived from the loaded uncorrected time and energy values.");
     }
 
-    if (!isCurrentEVScoringComparable()) {
-      setMessage(
-        elements.benchmarkWarning,
-        "Italy 2025 does not use the same EV Endurance and Efficiency scoring model as the current simulator. The loaded benchmark values are shown for reference, but the calculated EV scores are not directly comparable to the official Italian results."
-      );
-    }
-
     return;
   }
 
@@ -517,7 +502,7 @@ function renderBenchmarkCard() {
     items.push(`Acceleration: ${formatDisplayValue(modeData?.acceleration, 3)} s`);
     items.push(`Skidpad: ${formatDisplayValue(modeData?.skidpad, 3)} s`);
     items.push(`Autocross: ${modeData?.autocross === null ? "Not registered" : `${formatDisplayValue(modeData?.autocross, 3)} s`}`);
-    items.push(`Endurance: ${formatDisplayValue(modeData?.endurance, 3)} s`);
+    items.push(`Endurance corrected benchmark: ${formatDisplayValue(modeData?.endurance, 3)} s`);
     items.push(`Efficiency uncorrected time: ${formatDisplayValue(modeData?.efficiency?.time, 3)} s`);
     items.push(`Energy used: ${formatDisplayValue(modeData?.efficiency?.energyKwh, 3)} ${getEnergyUnitLabel()}`);
 
@@ -527,10 +512,6 @@ function renderBenchmarkCard() {
 
     items.push(`Efficiency Factor: ${formatDisplayValue(effectiveEfficiency.value, 0)}`);
     items.push(`Efficiency formula set: ${state.currentRuleset}`);
-
-    if (!isCurrentEVScoringComparable()) {
-      items.push("Scoring model note: official Italy EV scoring is competition-specific and not directly comparable here");
-    }
   } else {
     items.push(`Acceleration: ${formatDisplayValue(modeData?.acceleration, 3)} s`);
     items.push(`Skidpad: ${formatDisplayValue(modeData?.skidpad, 3)} s`);
@@ -602,8 +583,8 @@ function getScenarioColumns() {
   if (isEVMode()) {
     return [
       "Scenario name",
-      "Corrected time Tteam [s]",
       "Uncorrected time T [s]",
+      "Corrected time Tteam [s]",
       `Energy used E [${getEnergyUnitLabel()}]`,
       "Notes",
       "Remove"
@@ -628,8 +609,8 @@ function renderScenarioTableHead() {
 
 function createScenarioRow(scenario = {}) {
   const row = document.createElement("tr");
-  const primaryPlaceholder = isEVMode() ? "1535" : "225";
-  const secondaryPlaceholder = isEVMode() ? "1528" : "11";
+  const primaryPlaceholder = isEVMode() ? "1528" : "225";
+  const secondaryPlaceholder = isEVMode() ? "1535" : "11";
   const secondaryStep = isEVMode() ? "0.1" : "1";
   const secondaryMin = isEVMode() ? "0.01" : "0";
   const tertiaryPlaceholder = "4.45";
@@ -684,13 +665,6 @@ function loadDemoData() {
   clearScenarios();
   getDemoScenariosForSelection().forEach((scenario) => addScenarioRow(scenario));
   showInfo(isEVMode() ? "Endurance + Efficiency demo scenarios loaded." : "Trackdrive demo scenarios loaded.");
-
-  if (isEVMode() && !isCurrentEVScoringComparable()) {
-    setMessage(
-      elements.benchmarkWarning,
-      "Italy 2025 uses a different official EV scoring framework. Use this page only as a what-if simulator unless we add the dedicated Italian formula."
-    );
-  }
 }
 
 function readBenchmarks() {
@@ -719,8 +693,8 @@ function readScenarios() {
     if (isEVMode()) {
       return {
         ...scenario,
-        Tteam: Number(row.querySelector(".scenario-primary").value),
-        Tuncorrected: Number(row.querySelector(".scenario-secondary").value),
+        Tuncorrected: Number(row.querySelector(".scenario-primary").value),
+        Tteam: Number(row.querySelector(".scenario-secondary").value),
         Eteam: Number(row.querySelector(".scenario-tertiary").value)
       };
     }
@@ -858,8 +832,8 @@ function renderResultsHeaders() {
     elements.resultsTableHeadRow.innerHTML = `
       <th>Rank</th>
       <th>Scenario name</th>
-      <th>Tteam corrected [s]</th>
       <th>T uncorrected [s]</th>
+      <th>Tteam corrected [s]</th>
       <th>Eteam [${escapeHtml(getEnergyUnitLabel())}]</th>
       <th>EFteam</th>
       <th>Endurance points</th>
@@ -887,8 +861,8 @@ function renderEVResults(results) {
     <tr>
       <td>${index + 1}</td>
       <td>${escapeHtml(result.name)}</td>
-      <td>${formatNumber(result.Tteam, 1)}</td>
       <td>${formatNumber(result.Tuncorrected, 1)}</td>
+      <td>${formatNumber(result.Tteam, 1)}</td>
       <td>${formatNumber(result.Eteam, 2)}</td>
       <td>${formatNumber(result.EFteam, 0)}</td>
       <td>${formatNumber(result.endurancePoints, 2)}</td>
@@ -1022,8 +996,8 @@ function exportCSV(results) {
     headers = [
       "Rank",
       "Scenario name",
-      "Tteam corrected [s]",
       "T uncorrected [s]",
+      "Tteam corrected [s]",
       `Eteam [${getEnergyUnitLabel()}]`,
       "EFteam",
       "Endurance points",
@@ -1035,8 +1009,8 @@ function exportCSV(results) {
     rows = results.map((result, index) => ([
       index + 1,
       result.name,
-      result.Tteam,
       result.Tuncorrected,
+      result.Tteam,
       result.Eteam,
       result.EFteam,
       result.endurancePoints,
@@ -1132,12 +1106,8 @@ function calculateAllScenarios() {
 function refreshSectionCopy() {
   if (isEVMode()) {
     elements.scenarioSectionTitle.textContent = "Endurance + Efficiency Scenarios";
-    elements.scenarioSectionCopy.textContent = isCurrentEVScoringComparable()
-      ? "Each row represents one endurance and energy strategy to compare."
-      : "Each row represents one endurance and energy strategy to compare, but note that Italy 2025 official scoring follows a different model.";
-    elements.resultsSectionCopy.textContent = isCurrentEVScoringComparable()
-      ? `Results are automatically sorted from highest to lowest combined score using the ${state.currentRuleset} formulas.`
-      : `Results are sorted using the ${state.currentRuleset} simulator formulas, which are not the same as the official Italy 2025 EV scoring.`;
+    elements.scenarioSectionCopy.textContent = "Enter uncorrected time first, then corrected time, then energy for each scenario.";
+    elements.resultsSectionCopy.textContent = `Results are automatically sorted from highest to lowest combined score using the ${state.currentRuleset} formulas.`;
     return;
   }
 
